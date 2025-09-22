@@ -1,0 +1,19 @@
+[package]
+name = "jsm_form"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+tokio = { version = "1.0", features = ["full"] }
+reqwest = { version = "0.11", features = ["json", "cookies"] }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+clap = { version = "4.0", features = ["derive"] }
+config = "0.14"
+anyhow = "1.0"
+tracing = "0.1"
+tracing-subscriber = "0.3"
+headless_chrome = "1.0"
+url = "2.5"
+toml = "0.8"
+rpassword = "7.3"

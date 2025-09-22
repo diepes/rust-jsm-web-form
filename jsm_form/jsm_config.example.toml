@@ -1,0 +1,21 @@
+# JSM Form Configuration
+# For authentication with Atlassian Cloud, you need:
+# - username: Your email address used for Atlassian login
+# - password: An API token (NOT your account password)
+#
+# To create an API token:
+# 1. Go to https://id.atlassian.com/manage-profile/security/api-tokens
+# 2. Click "Create API token"
+# 3. Give it a name and copy the generated token
+# 4. Use that token as the password below
+
+org = "your-organization"
+base_url = "https://your-organization.atlassian.net"
+portal_id = 6
+request_type_id = 73
+
+[auth]
+# Your Atlassian account email address
+username = "your-email@domain.com"
+# Your Atlassian API token (create at the URL above)
+password = "your-api-token-here"

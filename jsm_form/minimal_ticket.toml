@@ -1,0 +1,6 @@
+# Minimal TOML file for JSM ticket creation
+# Contains only the required fields
+
+summary = "Test Pieter - Quick change request"
+customfield_10878 = "2025-09-23T09:00:00.000+1300"  # Planned start
+customfield_10879 = "2025-09-23T10:00:00.000+1300"  # Planned end
