@@ -1,6 +1,6 @@
 use anyhow::{Context, Result};
 use clap::{Parser, Subcommand};
-use jsm_form::{JsmFormClient, JsmConfig, FormData};
+use jsm_form::{JsmFormClient, JsmConfig, FormData, RiskAssessmentConfig};
 use std::collections::HashMap;
 use std::path::PathBuf;
 use serde_json::Value;
@@ -37,6 +37,18 @@ enum Commands {
         /// TOML file containing form data
         #[arg(short = 't', long = "toml")]
         toml_file: Option<PathBuf>,
+    },
+    /// Complete risk assessment form for an existing ticket
+    RiskAssessment {
+        /// Path to the config file
+        #[arg(short, long, default_value = "jsm_config.pvt.toml")]
+        config: PathBuf,
+        /// Ticket ID (e.g., ITH-66035)
+        #[arg(short = 'i', long = "ticket-id")]
+        ticket_id: String,
+        /// TOML file containing risk assessment configuration
+        #[arg(short = 't', long = "toml")]
+        toml_file: PathBuf,
     },
     /// Analyze form structure (for debugging)
     Analyze {
@@ -163,6 +175,33 @@ async fn main() -> Result<()> {
             println!("Submitting form with {} fields...", form_data.fields.len());
             client.submit_form(form_data).await?;
             println!("Form submitted successfully!");
+        }
+        
+        Commands::RiskAssessment { config, ticket_id, toml_file } => {
+            let mut config = jsm_form::config::load_config(&config)?;
+            
+            // Ensure credentials are provided
+            ensure_credentials(&mut config)?;
+            
+            // Load risk assessment configuration from TOML file
+            let toml_content = std::fs::read_to_string(&toml_file)
+                .with_context(|| format!("Failed to read TOML file: {}", toml_file.display()))?;
+            
+            // Parse the entire TOML file first
+            let toml_value: toml::Value = toml::from_str(&toml_content)
+                .with_context(|| format!("Failed to parse TOML file: {}", toml_file.display()))?;
+            
+            // Extract the risk_assessment section
+            let risk_assessment_section = toml_value.get("risk_assessment")
+                .context("Missing 'risk_assessment' section in TOML file")?;
+            
+            // Convert the risk_assessment section to RiskAssessmentConfig
+            let risk_config: RiskAssessmentConfig = risk_assessment_section.clone().try_into()
+                .with_context(|| format!("Failed to parse risk assessment configuration from TOML file: {}", toml_file.display()))?;
+            
+            println!("Completing risk assessment for ticket: {}", ticket_id);
+            jsm_form::web::complete_risk_assessment(&config, &ticket_id, &risk_config)?;
+            println!("Risk assessment completed successfully!");
         }
         
         Commands::Analyze { config } => {

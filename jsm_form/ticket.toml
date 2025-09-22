@@ -43,6 +43,13 @@ customfield_11025 = """xxImpact analysis:
 - Minimal user impact (30 minute downtime)
 - All tests passed in staging environment"""
 
+# Risk Assessment Configuration (for use with risk-assessment command)
+[risk_assessment]
+
+[risk_assessment.change_impact_assessment]
+# Security Impact - only configuring the first field as requested
+security_controls_impact = "No"  # Options: Yes/No/I don't know
+
 # Affected services (using exact format from web interface)
 [[customfield_10243]]
 id = "ari:cloud:graph::service/9ff4cfc8-0856-11eb-a1a9-0a77f3f45304/b60f4bd2-68d1-11ef-952e-1201f16ed41f"

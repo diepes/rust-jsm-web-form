@@ -6,9 +6,13 @@ pub mod auth;
 pub mod form;
 pub mod config;
 pub mod error;
+pub mod web;
 
 use anyhow::Result;
 use serde::{Deserialize, Serialize};
+
+// Re-export web automation types
+pub use web::{RiskAssessmentConfig, ChangeImpactAssessmentConfig, ChangeRiskAssessmentConfig};
 
 /// Configuration for the JSM form automation
 #[derive(Debug, Clone, Deserialize, Serialize)]
