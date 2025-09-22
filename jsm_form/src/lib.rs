@@ -37,8 +37,8 @@ pub struct AuthConfig {
 /// Form data to be submitted
 #[derive(Debug, Deserialize, Serialize)]
 pub struct FormData {
-    /// Map of field names to values
-    pub fields: std::collections::HashMap<String, String>,
+    /// Map of field names to values (supports strings, arrays, objects, etc.)
+    pub fields: std::collections::HashMap<String, serde_json::Value>,
 }
 
 /// Main JSM form client

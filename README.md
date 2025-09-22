@@ -60,6 +60,57 @@ cargo run -- submit -d "summary=Test Issue" -d "description=This is a test issue
 cargo run -- submit -j data.json
 ```
 
+### Submit form data from TOML file:
+```bash
+# Create ticket.toml with required fields
+cargo run -- submit -t ticket.toml
+
+# Or combine TOML file with command line overrides
+cargo run -- submit -t ticket.toml -d "summary=Override Summary"
+```
+
+Example `ticket.toml` for JSM Normal Change requests:
+```toml
+# Required fields
+summary = "Deploy new application version 2.3.1"
+
+# Required datetime fields (use ISO 8601 format with timezone)
+customfield_10878 = "2025-09-23T14:00:00.000+1300"  # Planned start
+customfield_10879 = "2025-09-23T16:00:00.000+1300"  # Planned end
+
+# Optional fields
+description = "This change deploys version 2.3.1 with bug fixes and improvements."
+
+# Optional change management fields
+customfield_10883 = """Implementation plan:
+1. Stop application services at 14:00
+2. Deploy new version from staging
+3. Update configuration files
+4. Restart services"""
+
+customfield_10884 = """Backout plan:
+1. Stop application services
+2. Restore previous version from backup
+3. Restart services"""
+```
+
+### Field Priority Order
+
+When using multiple data sources, fields are loaded in the following priority order (later sources override earlier ones):
+
+1. **TOML file** (using `-t ticket.toml`)
+2. **JSON file** (using `-j data.json`)  
+3. **Command line arguments** (using `-d key=value`)
+
+Example combining all three:
+```bash
+# TOML file has summary="Base Summary"
+# JSON file has summary="Updated Summary" 
+# Command line overrides with summary="Final Summary"
+cargo run -- submit -t base.toml -j updates.json -d "summary=Final Summary"
+# Result: Uses "Final Summary" from command line
+```
+
 ### Analyze form structure (for debugging):
 ```bash
 cargo run -- analyze
@@ -75,12 +126,23 @@ cargo run -- analyze
 
 ## Form Field Discovery
 
-The tool automatically discovers form fields by parsing the JSM form HTML. Common JSM fields include:
-- `summary` - Issue title
-- `description` - Issue description  
-- `priority` - Issue priority
-- `components` - Components affected
-- Custom fields specific to your JSM configuration
+The tool can discover form fields and their IDs using the `analyze` command:
+
+```bash
+cargo run -- analyze
+```
+
+This will show you available fields for your specific request type. Common JSM fields include:
+- `summary` - Issue title (required)
+- `description` - Issue description
+- `customfield_XXXXX` - Custom fields specific to your JSM configuration
+
+For JSM Normal Change requests, typical required fields are:
+- `summary` - Change title
+- `customfield_10878` - Planned start datetime
+- `customfield_10879` - Planned end datetime
+
+Use the analyze command to discover the exact field IDs for your JSM instance.
 
 ## Troubleshooting
 

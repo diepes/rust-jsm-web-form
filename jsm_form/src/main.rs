@@ -1,8 +1,9 @@
-use anyhow::{Result, Context};
+use anyhow::{Context, Result};
 use clap::{Parser, Subcommand};
 use jsm_form::{JsmFormClient, JsmConfig, FormData};
 use std::collections::HashMap;
 use std::path::PathBuf;
+use serde_json::Value;
 use std::io::{self, Write};
 use tracing_subscriber;
 
@@ -102,33 +103,51 @@ async fn main() -> Result<()> {
             println!("Authentication successful!");
             
             // Prepare form data
-            let mut fields = HashMap::new();
+            let mut fields: HashMap<String, Value> = HashMap::new();
             
             // Load from TOML file if provided
             if let Some(toml_path) = toml_file {
                 let toml_content = std::fs::read_to_string(&toml_path)
                     .with_context(|| format!("Failed to read TOML file: {}", toml_path.display()))?;
-                let toml_fields: HashMap<String, String> = toml::from_str(&toml_content)
+                
+                // Parse as TOML value first, then convert to JSON value
+                let toml_value: toml::Value = toml::from_str(&toml_content)
                     .with_context(|| format!("Failed to parse TOML file: {}", toml_path.display()))?;
-                fields.extend(toml_fields);
-                println!("Loaded {} fields from TOML file: {}", fields.len(), toml_path.display());
+                
+                // Convert TOML value to JSON value
+                let json_string = serde_json::to_string(&toml_value)
+                    .context("Failed to convert TOML to JSON")?;
+                let json_value: Value = serde_json::from_str(&json_string)
+                    .context("Failed to parse converted JSON")?;
+                
+                if let Value::Object(map) = json_value {
+                    fields.extend(map);
+                    println!("Loaded {} fields from TOML file: {}", fields.len(), toml_path.display());
+                } else {
+                    return Err(anyhow::anyhow!("TOML file must contain an object at the root level"));
+                }
             }
             
             // Load from JSON file if provided (will override TOML fields with same keys)
             if let Some(json_path) = json_file {
                 let json_content = std::fs::read_to_string(&json_path)
                     .with_context(|| format!("Failed to read JSON file: {}", json_path.display()))?;
-                let json_fields: HashMap<String, String> = serde_json::from_str(&json_content)
+                let json_value: Value = serde_json::from_str(&json_content)
                     .with_context(|| format!("Failed to parse JSON file: {}", json_path.display()))?;
-                let json_field_count = json_fields.len();
-                fields.extend(json_fields);
-                println!("Loaded {} additional fields from JSON file: {}", json_field_count, json_path.display());
+                
+                if let Value::Object(map) = json_value {
+                    let json_field_count = map.len();
+                    fields.extend(map);
+                    println!("Loaded {} additional fields from JSON file: {}", json_field_count, json_path.display());
+                } else {
+                    return Err(anyhow::anyhow!("JSON file must contain an object at the root level"));
+                }
             }
             
             // Add command line data (will override file fields with same keys)
             for item in data {
                 if let Some((key, value)) = item.split_once('=') {
-                    fields.insert(key.to_string(), value.to_string());
+                    fields.insert(key.to_string(), Value::String(value.to_string()));
                 } else {
                     eprintln!("Warning: Invalid data format '{}', expected 'key=value'", item);
                 }

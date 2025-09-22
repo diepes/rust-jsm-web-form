@@ -84,7 +84,7 @@ struct CreateRequestPayload {
     #[serde(rename = "requestTypeId")]
     request_type_id: u32,
     #[serde(rename = "requestFieldValues")]
-    request_field_values: std::collections::HashMap<String, String>,
+    request_field_values: std::collections::HashMap<String, serde_json::Value>,
     #[serde(rename = "raiseOnBehalfOf", skip_serializing_if = "Option::is_none")]
     raise_on_behalf_of: Option<String>,
 }

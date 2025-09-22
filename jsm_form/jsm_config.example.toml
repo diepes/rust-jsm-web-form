@@ -9,8 +9,11 @@
 # 3. Give it a name and copy the generated token
 # 4. Use that token as the password below
 
+# Organization name (your Atlassian subdomain)
 org = "your-organization"
+# Full base URL (should match your org name)
 base_url = "https://your-organization.atlassian.net"
+# Portal and request type IDs (find these in your JSM instance)
 portal_id = 6
 request_type_id = 73
 
