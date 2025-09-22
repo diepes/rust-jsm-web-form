@@ -92,7 +92,31 @@ customfield_10884 = """Backout plan:
 1. Stop application services
 2. Restore previous version from backup
 3. Restart services"""
+
+# IMPORTANT: Array of tables MUST be at the end of the TOML file
+[[customfield_10243]]
+name = "Service Name 1"
+
+[[customfield_10243]]
+name = "Service Name 2"
 ```
+
+**Service Entity Fields**: For fields like "Affected Services" that reference actual services in your JSM service registry, use the complete service object format:
+
+```toml
+# Affected services (requires actual service ARIs from JSM service registry)
+[[customfield_10243]]
+id = "ari:cloud:graph::service/SERVICE-UUID/INSTANCE-UUID"
+name = "Service Name"
+description = ""
+
+[customfield_10243.tier]
+level = 1
+```
+
+To find service ARIs: manually add a service through JSM's web interface and check the browser's network tab to see the exact format.
+
+**Important TOML Structure Note**: When using array of tables syntax (`[[field_name]]`), these entries MUST be placed at the end of the TOML file. Any fields defined after array of tables will be merged into the last array entry, causing data corruption.
 
 ### Field Priority Order
 

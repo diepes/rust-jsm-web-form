@@ -1,5 +1,6 @@
 # Private configuration files
 jsm_config.pvt.toml
+.jsm_token
 
 # Rust
 target/

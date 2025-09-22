@@ -9,16 +9,6 @@ summary = "TEST Pieter - Deploy new application version 2.3.1"
 customfield_10878 = "2025-09-23T14:00:00.000+1300"  # Planned start
 customfield_10879 = "2025-09-23T16:00:00.000+1300"  # Planned end
 
-# Affected services (service entity field - expects array of objects with name/id)
-[[customfield_10243]]
-name = "Azure Virtual Server"
-
-[[customfield_10243]]
-name = "Azure Networking"
-
-[[customfield_10243]]
-name = "Azure Cloud"
-
 # Optional fields
 description = "xxThis change deploys version 2.3.1 of the customer portal application including bug fixes and performance improvements."
 
@@ -52,3 +42,12 @@ customfield_11025 = """xxImpact analysis:
 - No database changes required
 - Minimal user impact (30 minute downtime)
 - All tests passed in staging environment"""
+
+# Affected services (using exact format from web interface)
+[[customfield_10243]]
+id = "ari:cloud:graph::service/9ff4cfc8-0856-11eb-a1a9-0a77f3f45304/b60f4bd2-68d1-11ef-952e-1201f16ed41f"
+name = "Azure Cloud"
+description = ""
+
+[customfield_10243.tier]
+level = 1
