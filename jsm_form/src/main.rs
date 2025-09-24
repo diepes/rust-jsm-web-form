@@ -165,6 +165,11 @@ async fn main() -> Result<()> {
                 }
             }
             
+            // Remove configuration-only sections not accepted by the REST API
+            if fields.remove("risk_assessment").is_some() {
+                println!("Stripped 'risk_assessment' section from submission payload (used only for risk-assessment command)");
+            }
+
             let form_data = FormData { fields };
             
             if form_data.fields.is_empty() {

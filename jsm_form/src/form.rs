@@ -3,6 +3,14 @@ use reqwest::Client;
 use serde::{Deserialize, Serialize};
 use crate::{JsmConfig, FormData};
 
+/// Remove any keys that are known to be configuration-only or not valid for the JSM REST API.
+fn sanitize_request_fields(mut fields: std::collections::HashMap<String, serde_json::Value>) -> std::collections::HashMap<String, serde_json::Value> {
+    // Keys we know should not be sent to the API
+    const CONFIG_KEYS: [&str; 1] = ["risk_assessment"]; // extend as needed
+    for k in CONFIG_KEYS { fields.remove(k); }
+    fields
+}
+
 /// Submit form data to the JSM service desk using the REST API
 pub async fn submit_form(
     client: &Client,
@@ -16,10 +24,11 @@ pub async fn submit_form(
     );
     
     // Prepare the request payload according to Atlassian API format
+    let cleaned_fields = sanitize_request_fields(form_data.fields);
     let request_payload = CreateRequestPayload {
         service_desk_id: config.portal_id,
         request_type_id: config.request_type_id,
-        request_field_values: form_data.fields,
+        request_field_values: cleaned_fields,
         raise_on_behalf_of: None, // Current user
     };
     
