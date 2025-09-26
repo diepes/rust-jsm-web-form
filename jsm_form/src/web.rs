@@ -78,8 +78,9 @@ impl JsmWebClient {
             std::thread::sleep(Duration::from_secs(15));
             
             // Simple placeholder implementation
+            // get fields from config
             if let Some(value) = &config.change_impact_assessment.security_controls_impact {
-                info!("Would set security controls impact to: {}", value);
+                info!("TODO: Would set security controls impact to: {}", value);
             }
             
             info!("Risk assessment completed successfully");

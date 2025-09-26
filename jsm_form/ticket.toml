@@ -10,10 +10,10 @@ customfield_10878 = "2025-09-23T14:00:00.000+1300"  # Planned start
 customfield_10879 = "2025-09-23T16:00:00.000+1300"  # Planned end
 
 # Optional fields
-description = "xxThis change deploys version 2.3.1 of the customer portal application including bug fixes and performance improvements."
+description = "This change deploys version 2.3.1 of the customer portal application including bug fixes and performance improvements."
 
 # Optional change management fields
-customfield_10883 = """xxImplementation plan:
+customfield_10883 = """Implementation plan:
 1. Stop application services at 14:00
 2. Deploy new version from staging
 3. Update configuration files
@@ -21,23 +21,23 @@ customfield_10883 = """xxImplementation plan:
 5. Run smoke tests
 6. Monitor for 30 minutes"""
 
-customfield_10884 = """xxBackout plan:
+customfield_10884 = """Backout plan:
 1. Stop application services
 2. Restore previous version from backup
 3. Restore previous configuration
 4. Restart services
 5. Verify functionality"""
 
-customfield_10885 = """xxTest plan:
+customfield_10885 = """Test plan:
 1. Verify application starts successfully
 2. Test user login functionality
 3. Test key user workflows
 4. Check performance metrics
 5. Verify database connectivity"""
 
-customfield_11024 = "xxThis deployment fixes critical security vulnerabilities and performance issues identified in production."
+customfield_11024 = "This deployment fixes critical security vulnerabilities and performance issues identified in production."
 
-customfield_11025 = """xxImpact analysis:
+customfield_11025 = """Impact analysis:
 - Low risk deployment during maintenance window
 - No database changes required
 - Minimal user impact (30 minute downtime)
