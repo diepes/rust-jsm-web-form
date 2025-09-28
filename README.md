@@ -35,8 +35,9 @@ portal_id = 6
 request_type_id = 73
 
 [auth]
-username = ""  # Leave empty to be prompted
-password = ""  # Leave empty to be prompted (secure input)
+username = ""              # Leave empty to be prompted
+token_atlassian_api = ""   # Leave empty to be prompted (secure input)
+microsoft_password = ""    # Leave empty to be prompted (secure input)
 ```
 
 **Note:** You can leave the username and password fields empty in the config file. The tool will securely prompt you for these credentials when needed.

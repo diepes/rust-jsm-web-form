@@ -1,6 +1,5 @@
 use anyhow::{Context, Result};
-use headless_chrome::Tab;
-use serde_json::to_string;
+use headless_chrome::{browser::tab::ModifierKey, Tab};
 use std::sync::Arc;
 use std::time::Duration;
 use tracing::{info, warn};
@@ -15,6 +14,7 @@ pub(crate) fn wait_for_ticket_page(
     ticket_id: &str,
     timeout_secs: u64,
     username: Option<&str>,
+    password: Option<&str>,
 ) -> Result<bool> {
     info!("Going through login steps ...");
     let mut start_time = std::time::Instant::now();
@@ -22,11 +22,16 @@ pub(crate) fn wait_for_ticket_page(
 
     let mut current_url: String = "".to_string();
     let user = username.unwrap_or_default();
+    let pass = password.unwrap_or_default();
     let mut atlassian_username_done = false;
     let mut account_continue_done = false;
     let mut microsoft_username_done = false;
+    let mut microsoft_password_done = false;
+    let mut warned_same_url = false;
+
     while start_time.elapsed() < timeout {
-        std::thread::sleep(Duration::from_millis(1000));
+        std::thread::sleep(Duration::from_millis(5000));
+        tab.wait_until_navigated()?;
         let new_url = tab.get_url();
         info!("Check new URL: {}", new_url);
 
@@ -34,10 +39,13 @@ pub(crate) fn wait_for_ticket_page(
             return Ok(true);
         }
         if new_url == current_url {
-            warn!(
-                "Login appears stuck on the same URL; please check if manual intervention is needed."
-            );
-            return Ok(false);
+            if !warned_same_url && start_time.elapsed() > Duration::from_secs(10) {
+                warn!(
+                    "Login URL has remained at {} for over 10 seconds; continuing to monitor in case manual action is required.",
+                    new_url
+                );
+                warned_same_url = true;
+            }
         }
 
         if new_url.starts_with("https://id.atlassian.com/") && new_url.contains("login") {
@@ -94,6 +102,21 @@ pub(crate) fn wait_for_ticket_page(
                         microsoft_username_done = true;
                     }
                 }
+            } else if !microsoft_password_done {
+                match try_fill_microsoft_password(tab, pass) {
+                    Ok(true) => {
+                        info!("Filled Microsoft password and submitted");
+                        microsoft_password_done = true;
+                        continue;
+                    }
+                    Ok(false) => {
+                        info!("Microsoft password field not ready yet; will retry...");
+                    }
+                    Err(err) => {
+                        warn!("Failed to auto-fill Microsoft password: {err:?}");
+                        microsoft_password_done = true;
+                    }
+                }
             }
         }
 
@@ -101,6 +124,7 @@ pub(crate) fn wait_for_ticket_page(
             info!("URL changed; resetting timeout. URL: {}", new_url);
             current_url = new_url.clone();
             start_time = std::time::Instant::now();
+            warned_same_url = false;
         }
     }
 
@@ -112,158 +136,227 @@ pub(crate) fn wait_for_ticket_page(
 }
 
 pub(crate) fn try_fill_atlassian_username(tab: &Arc<Tab>, username: &str) -> Result<bool> {
-    let username_json = to_string(username)?;
-    let script = format!(
-        r#"(function() {{
-            const targetUsername = {username}.toLowerCase();
+    if username.trim().is_empty() {
+        warn!("No Atlassian username provided; skipping auto-fill");
+        return Ok(false);
+    }
 
-            function normalise(text) {{
-                return (text || '').trim().toLowerCase();
-            }}
+    const SELECTORS: &[&str] = &[
+        "input[data-testid=\"username\"]",
+        "input[name=\"username\"]",
+        "input#username",
+        "input[type=\"email\"]",
+    ];
 
-            const buttons = Array.from(document.querySelectorAll('button, [role=\"button\"]'));
-
-            for (const button of buttons) {{
-                const buttonText = normalise(button.innerText || button.textContent);
-                if (!buttonText) {{
-                    continue;
-                }}
-
-                const dataTestId = normalise(button.getAttribute('data-test-id'));
-                const container = button.closest('[data-testid], [role], div, form, main');
-                const containerText = normalise(container ? container.innerText || container.textContent : '');
-                const relatesToUser =
-                    dataTestId.includes(targetUsername) ||
-                    containerText.includes(targetUsername) ||
-                    buttonText.includes(targetUsername);
-
-                const isContinue = buttonText === 'continue' || buttonText.startsWith('sign in');
-                if (relatesToUser && isContinue) {{
-                    button.click();
-                    return "clicked-account";
-                }}
-
-                if (!relatesToUser && dataTestId && dataTestId.includes('account-item') && containerText.includes(targetUsername)) {{
-                    button.click();
-                    return "clicked-account";
-                }}
-            }}
-
-            const useAnother = buttons.find(btn => normalise(btn.innerText || btn.textContent).includes('use another account'));
-            if (useAnother) {{
-                useAnother.click();
-                return "opened-use-another";
-            }}
-
-            const usernameField = document.querySelector('input[data-testid=\"username\"], input[name=\"username\"], input#username, input[type=\"email\"]');
-            if (!usernameField) {{
-                return "not-found";
-            }}
-            usernameField.focus();
-            usernameField.value = {username};
-            usernameField.dispatchEvent(new Event('input', {{ bubbles: true }}));
-            usernameField.dispatchEvent(new Event('change', {{ bubbles: true }}));
-
-            const nextButton = document.querySelector('button[data-testid=\"login-submit-idf-testid\"], button[type=\"submit\"], button#login-submit, button[data-testid=\"next-button\"]');
-            if (nextButton) {{
-                nextButton.click();
-                return "filled-and-submitted";
-            }}
-            return "filled";
-        }})"#,
-        username = username_json
-    );
-
-    let result = tab
-        .evaluate(&script, false)
-        .context("Failed to evaluate JavaScript to fill username")?;
-
-    let status = result
-        .value
-        .and_then(|v| v.as_str().map(|s| s.to_string()))
-        .unwrap_or_default();
-
-    match status.as_str() {
-        "filled" | "filled-and-submitted" | "clicked-account" => Ok(true),
-        "opened-use-another" => {
-            info!(
-                "Triggered 'Use another account' on Atlassian login; waiting for username field to appear."
-            );
-            Ok(false)
-        }
-        "not-found" => Ok(false),
-        other => {
-            if !other.is_empty() {
-                warn!("Unhandled Atlassian login status: {other}");
+    let mut field = None;
+    for selector in SELECTORS {
+        match tab.wait_for_element_with_custom_timeout(selector, Duration::from_secs(5)) {
+            Ok(element) => {
+                info!("Found Atlassian username field with selector '{}'; focusing", selector);
+                field = Some(element);
+                break;
             }
-            Ok(false)
+            Err(err) => {
+                info!(
+                    "Username selector '{}' not ready yet: {:#}",
+                    selector,
+                    err
+                );
+            }
         }
     }
+
+    let Some(element) = field else {
+        return Ok(false);
+    };
+
+    element.scroll_into_view()?;
+    element.click()?;
+
+    let modifier_combos: [&[ModifierKey]; 2] = [
+        &[ModifierKey::Ctrl],
+        &[ModifierKey::Meta],
+    ];
+
+    for modifiers in modifier_combos {
+        if tab.press_key_with_modifiers("KeyA", Some(modifiers)).is_ok() {
+            let _ = tab.press_key("Backspace");
+            break;
+        }
+    }
+
+    tab.send_character(username)
+        .context("Failed to type Atlassian username")?;
+    tab.press_key("Enter")
+        .context("Failed to submit Atlassian username")?;
+
+    Ok(true)
 }
 
 pub(crate) fn try_fill_microsoft_username(tab: &Arc<Tab>, username: &str) -> Result<bool> {
-    let username_json = to_string(username)?;
-    let script = format!(
-        r#"(function() {{
-            const input = document.querySelector('input[name=\"loginfmt\"], input#i0116, input[type=\"email\"]');
-            if (!input) {{
-                return "not-found";
-            }}
-            input.focus();
-            input.value = {username};
-            input.dispatchEvent(new Event('input', {{ bubbles: true }}));
-            input.dispatchEvent(new Event('change', {{ bubbles: true }}));
+    if username.trim().is_empty() {
+        warn!("No Microsoft username provided; skipping auto-fill");
+        return Ok(false);
+    } else {
+        info!("Filling Microsoft username: {}", username);
+    }
 
-            const nextButton = document.querySelector('#idSIButton9, button[type=\"submit\"], input[type=\"submit\"]');
-            if (nextButton) {{
-                nextButton.click();
-                return "submitted";
-            }}
-            return "filled";
-        }})"#,
-        username = username_json
-    );
+    const SELECTORS: &[&str] = &[
+        "input[name=\"loginfmt\"]",
+        "input#i0116",
+        "input[type=\"email\"]",
+    ];
 
-    let result = tab
-        .evaluate(&script, false)
-        .context("Failed to evaluate JavaScript to fill Microsoft username")?;
+    let mut field = None;
+    for selector in SELECTORS {
+        match tab.wait_for_element_with_custom_timeout(selector, Duration::from_secs(5)) {
+            Ok(element) => {
+                info!(
+                    "Found Microsoft username field with selector '{}'; focusing",
+                    selector
+                );
+                field = Some(element);
+                break;
+            }
+            Err(err) => {
+                info!(
+                    "Microsoft username selector '{}' not ready yet: {:#}",
+                    selector,
+                    err
+                );
+            }
+        }
+    }
 
-    let status = result
-        .value
-        .and_then(|v| v.as_str().map(|s| s.to_string()))
-        .unwrap_or_default();
+    let Some(element) = field else {
+        return Ok(false);
+    };
 
-    Ok(matches!(status.as_str(), "filled" | "submitted"))
+    element.scroll_into_view()?;
+    element.click()?;
+
+    let modifier_combos: [&[ModifierKey]; 2] = [
+        &[ModifierKey::Ctrl],
+        &[ModifierKey::Meta],
+    ];
+
+    for modifiers in modifier_combos {
+        if tab.press_key_with_modifiers("KeyA", Some(modifiers)).is_ok() {
+            let _ = tab.press_key("Backspace");
+            break;
+        }
+    }
+
+    tab.send_character(username)
+        .context("Failed to type Microsoft username")?;
+
+    if tab.press_key("Enter").is_err() {
+        if let Ok(button) = tab.wait_for_element_with_custom_timeout("#idSIButton9", Duration::from_secs(2)) {
+            info!("Clicking Microsoft Next button directly");
+            button.scroll_into_view()?;
+            button.click()?;
+        }
+    }
+
+    Ok(true)
+}
+
+pub(crate) fn try_fill_microsoft_password(tab: &Arc<Tab>, password: &str) -> Result<bool> {
+    if password.trim().is_empty() {
+        warn!("No Microsoft password provided; skipping auto-fill");
+        return Ok(false);
+    }
+
+    const SELECTORS: &[&str] = &[
+        "input[name=\"passwd\"]",
+        "input#i0118",
+        "input[type=\"password\"]",
+    ];
+
+    let mut field = None;
+    for selector in SELECTORS {
+        match tab.wait_for_element_with_custom_timeout(selector, Duration::from_secs(5)) {
+            Ok(element) => {
+                info!(
+                    "Found Microsoft password field with selector '{}'; focusing",
+                    selector
+                );
+                field = Some(element);
+                break;
+            }
+            Err(err) => {
+                info!(
+                    "Microsoft password selector '{}' not ready yet: {:#}",
+                    selector,
+                    err
+                );
+            }
+        }
+    }
+
+    let Some(element) = field else {
+        return Ok(false);
+    };
+
+    element.scroll_into_view()?;
+    element.click()?;
+
+    let modifier_combos: [&[ModifierKey]; 2] = [
+        &[ModifierKey::Ctrl],
+        &[ModifierKey::Meta],
+    ];
+
+    for modifiers in modifier_combos {
+        if tab.press_key_with_modifiers("KeyA", Some(modifiers)).is_ok() {
+            let _ = tab.press_key("Backspace");
+            break;
+        }
+    }
+
+    tab.send_character(password)
+        .context("Failed to type Microsoft password")?;
+
+    if tab.press_key("Enter").is_err() {
+        if let Ok(button) = tab.wait_for_element_with_custom_timeout("#idSIButton9", Duration::from_secs(3)) {
+            info!("Clicking Microsoft sign-in button directly");
+            button.scroll_into_view()?;
+            button.click()?;
+        } else {
+            return Ok(false);
+        }
+    }
+
+    Ok(true)
 }
 
 pub(crate) fn try_click_account_continue(tab: &Arc<Tab>, username: &str) -> Result<bool> {
-    let username_json = to_string(&username.to_lowercase())?;
-    let script = format!(
-        r#"(function() {{
-            const email = {username};
-            const bodyText = (document.body.innerText || document.body.textContent || '').toLowerCase();
-            if (!bodyText.includes(email)) {{
-                return "email-not-found";
-            }}
-            const buttons = Array.from(document.querySelectorAll('button'));
-            const continueButton = buttons.find(btn => (btn.innerText || btn.textContent || '').trim().toLowerCase() === 'continue');
-            if (continueButton) {{
-                continueButton.click();
-                return "clicked";
-            }}
-            return "button-not-found";
-        }})"#,
-        username = username_json
-    );
+    if username.trim().is_empty() {
+        warn!("No Atlassian username provided; skipping continue button automation");
+        return Ok(false);
+    }
 
-    let result = tab
-        .evaluate(&script, false)
-        .context("Failed to evaluate JavaScript to click account continue")?;
+    let lowercase_username = username.to_lowercase();
 
-    let status = result
-        .value
-        .and_then(|v| v.as_str().map(|s| s.to_string()))
-        .unwrap_or_default();
+    let body_contains_user = tab
+        .wait_for_element_with_custom_timeout("body", Duration::from_secs(2))
+        .ok()
+        .and_then(|body| body.get_inner_text().ok())
+        .map(|text| text.to_lowercase().contains(&lowercase_username))
+        .unwrap_or(false);
 
-    Ok(status == "clicked")
+    if !body_contains_user {
+        return Ok(false);
+    }
+
+    let buttons = tab.find_elements("button")?;
+    for button in buttons {
+        let text = button.get_inner_text().unwrap_or_default();
+        if text.trim().eq_ignore_ascii_case("continue") {
+            button.scroll_into_view()?;
+            button.click()?;
+            return Ok(true);
+        }
+    }
+
+    Ok(false)
 }

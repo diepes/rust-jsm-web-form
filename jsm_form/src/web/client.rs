@@ -1,6 +1,7 @@
 use anyhow::{Context, Result, anyhow};
 use headless_chrome::{Browser, LaunchOptions, Tab};
 use serde_json::to_string;
+use std::path::PathBuf;
 use std::sync::Arc;
 use std::thread;
 use std::time::Duration;
@@ -32,12 +33,14 @@ impl JsmWebClient {
         if let Some(tab) = &self.tab {
             return Ok(Arc::clone(tab));
         }
-
+        // Save sessions data to persist logins across runs
+        let user_data_path = Some(PathBuf::from("./chrome_session_data_pvt")); 
         info!("Initializing browser...");
         if self.browser.is_none() {
             let browser = Browser::new(
                 LaunchOptions::default_builder()
                     .headless(false)
+                    .user_data_dir(user_data_path)
                     .build()
                     .context("Failed to build launch options")?,
             )?;
@@ -81,12 +84,22 @@ impl JsmWebClient {
             }
         };
 
+        let microsoft_password = {
+            let trimmed = self.config.auth.microsoft_password.trim();
+            if trimmed.is_empty() {
+                None
+            } else {
+                Some(trimmed)
+            }
+        };
+
         let is_on_correct_page = login::wait_for_ticket_page(
             &tab,
             &self.config.base_url,
             ticket_id,
             45,
             login_username,
+            microsoft_password,
         )?;
 
         if is_on_correct_page {

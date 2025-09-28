@@ -34,8 +34,12 @@ pub struct JsmConfig {
 pub struct AuthConfig {
     /// Username for authentication
     pub username: String,
-    /// Password for authentication
-    pub password: String,
+    /// API Token for authentication
+    #[serde(alias = "password", default)]
+    pub token_atlassian_api: String,
+    /// Password used for Microsoft login flow
+    #[serde(default)]
+    pub microsoft_password: String,
 }
 
 /// Form data to be submitted

@@ -73,14 +73,30 @@ fn ensure_credentials(config: &mut JsmConfig) -> Result<()> {
         }
     }
 
-    // Check and prompt for password
-    if config.auth.password.is_empty() || config.auth.password == "your-password" {
-        let password = rpassword::prompt_password("Enter password: ")?;
-        if password.is_empty() {
-            return Err(anyhow::anyhow!("Password cannot be empty"));
+    // Check and prompt for Atlassian API token
+    if config.auth.token_atlassian_api.is_empty()
+        || config.auth.token_atlassian_api == "your-api-token-here"
+        || config.auth.token_atlassian_api == "your-password"
+    {
+        let token = rpassword::prompt_password("Enter Atlassian API token: ")?;
+        if token.is_empty() {
+            return Err(anyhow::anyhow!("API token cannot be empty"));
         }
-        config.auth.password = password;
+        config.auth.token_atlassian_api = token;
     }
+
+    // // Check and prompt for Microsoft password used during web login
+    // if config.auth.microsoft_password.is_empty()
+    //     || config.auth.microsoft_password == "your-microsoft-password"
+    // {
+    //     let password = rpassword::prompt_password(
+    //         "Enter Microsoft password (used for interactive login): ",
+    //     )?;
+    //     if password.is_empty() {
+    //         return Err(anyhow::anyhow!("Microsoft password cannot be empty"));
+    //     }
+    //     config.auth.microsoft_password = password;
+    // }
 
     println!("Credentials configured for user: {}", config.auth.username);
     Ok(())
@@ -274,7 +290,7 @@ async fn main() -> Result<()> {
 
             let response = reqwest::Client::new()
                 .get(&request_type_url)
-                .basic_auth(&config.auth.username, Some(&config.auth.password))
+                .basic_auth(&config.auth.username, Some(&config.auth.token_atlassian_api))
                 .header("Accept", "application/json")
                 .send()
                 .await?;
@@ -299,7 +315,7 @@ async fn main() -> Result<()> {
 
             let fields_response = reqwest::Client::new()
                 .get(&fields_url)
-                .basic_auth(&config.auth.username, Some(&config.auth.password))
+                .basic_auth(&config.auth.username, Some(&config.auth.token_atlassian_api))
                 .header("Accept", "application/json")
                 .send()
                 .await?;

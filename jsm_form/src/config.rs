@@ -25,7 +25,8 @@ pub fn create_default_config() -> JsmConfig {
         request_type_id: 73,
         auth: AuthConfig {
             username: "".to_string(),
-            password: "".to_string(),
+            token_atlassian_api: "".to_string(),
+            microsoft_password: "".to_string(),
         },
     }
 }

@@ -1,6 +1,8 @@
 # Private configuration files
 jsm_config.pvt.toml
 .jsm_token
+chrome_session_data_pvt
+.chrome_session_data_pvt
 
 # Rust
 target/

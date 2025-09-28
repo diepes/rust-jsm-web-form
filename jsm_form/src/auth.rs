@@ -11,7 +11,7 @@ pub async fn authenticate(client: &Client, auth: &AuthConfig, base_url: &str) ->
 
     let response = client
         .get(&test_url)
-        .basic_auth(&auth.username, Some(&auth.password))
+        .basic_auth(&auth.username, Some(&auth.token_atlassian_api))
         .send()
         .await
         .context("Failed to test authentication")?;

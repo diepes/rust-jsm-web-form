@@ -33,7 +33,7 @@ pub async fn submit_form(client: &Client, config: &JsmConfig, form_data: FormDat
 
     let response = client
         .post(&create_request_url)
-        .basic_auth(&config.auth.username, Some(&config.auth.password))
+        .basic_auth(&config.auth.username, Some(&config.auth.token_atlassian_api))
         .header("Accept", "application/json")
         .header("Content-Type", "application/json")
         .json(&request_payload)
