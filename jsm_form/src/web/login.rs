@@ -1,5 +1,5 @@
 use anyhow::{Context, Result};
-use headless_chrome::{browser::tab::ModifierKey, Tab};
+use headless_chrome::{Tab, browser::tab::ModifierKey};
 use std::sync::Arc;
 use std::time::Duration;
 use tracing::{info, warn};
@@ -86,6 +86,21 @@ pub(crate) fn wait_for_ticket_page(
                     }
                 }
             }
+        } else if new_url
+            .starts_with("https://login.microsoftonline.com/common/DeviceAuthTls/reprocess")
+        {
+            if !warned_same_url {
+                info!(
+                    "Microsoft 2FA reprocess detected (URL: {}). Waiting for user to complete multi-factor authentication...",
+                    new_url
+                );
+                print!(
+                    "Please complete any required multi-factor authentication in the opened browser window. "
+                );
+                std::thread::sleep(Duration::from_millis(10000));
+                warned_same_url = true;
+            }
+            continue;
         } else if new_url.starts_with("https://login.microsoftonline.com/") {
             if !microsoft_username_done {
                 match try_fill_microsoft_username(tab, user) {
@@ -152,16 +167,15 @@ pub(crate) fn try_fill_atlassian_username(tab: &Arc<Tab>, username: &str) -> Res
     for selector in SELECTORS {
         match tab.wait_for_element_with_custom_timeout(selector, Duration::from_secs(5)) {
             Ok(element) => {
-                info!("Found Atlassian username field with selector '{}'; focusing", selector);
+                info!(
+                    "Found Atlassian username field with selector '{}'; focusing",
+                    selector
+                );
                 field = Some(element);
                 break;
             }
             Err(err) => {
-                info!(
-                    "Username selector '{}' not ready yet: {:#}",
-                    selector,
-                    err
-                );
+                info!("Username selector '{}' not ready yet: {:#}", selector, err);
             }
         }
     }
@@ -173,13 +187,13 @@ pub(crate) fn try_fill_atlassian_username(tab: &Arc<Tab>, username: &str) -> Res
     element.scroll_into_view()?;
     element.click()?;
 
-    let modifier_combos: [&[ModifierKey]; 2] = [
-        &[ModifierKey::Ctrl],
-        &[ModifierKey::Meta],
-    ];
+    let modifier_combos: [&[ModifierKey]; 2] = [&[ModifierKey::Ctrl], &[ModifierKey::Meta]];
 
     for modifiers in modifier_combos {
-        if tab.press_key_with_modifiers("KeyA", Some(modifiers)).is_ok() {
+        if tab
+            .press_key_with_modifiers("KeyA", Some(modifiers))
+            .is_ok()
+        {
             let _ = tab.press_key("Backspace");
             break;
         }
@@ -221,8 +235,7 @@ pub(crate) fn try_fill_microsoft_username(tab: &Arc<Tab>, username: &str) -> Res
             Err(err) => {
                 info!(
                     "Microsoft username selector '{}' not ready yet: {:#}",
-                    selector,
-                    err
+                    selector, err
                 );
             }
         }
@@ -235,13 +248,13 @@ pub(crate) fn try_fill_microsoft_username(tab: &Arc<Tab>, username: &str) -> Res
     element.scroll_into_view()?;
     element.click()?;
 
-    let modifier_combos: [&[ModifierKey]; 2] = [
-        &[ModifierKey::Ctrl],
-        &[ModifierKey::Meta],
-    ];
+    let modifier_combos: [&[ModifierKey]; 2] = [&[ModifierKey::Ctrl], &[ModifierKey::Meta]];
 
     for modifiers in modifier_combos {
-        if tab.press_key_with_modifiers("KeyA", Some(modifiers)).is_ok() {
+        if tab
+            .press_key_with_modifiers("KeyA", Some(modifiers))
+            .is_ok()
+        {
             let _ = tab.press_key("Backspace");
             break;
         }
@@ -251,7 +264,9 @@ pub(crate) fn try_fill_microsoft_username(tab: &Arc<Tab>, username: &str) -> Res
         .context("Failed to type Microsoft username")?;
 
     if tab.press_key("Enter").is_err() {
-        if let Ok(button) = tab.wait_for_element_with_custom_timeout("#idSIButton9", Duration::from_secs(2)) {
+        if let Ok(button) =
+            tab.wait_for_element_with_custom_timeout("#idSIButton9", Duration::from_secs(2))
+        {
             info!("Clicking Microsoft Next button directly");
             button.scroll_into_view()?;
             button.click()?;
@@ -287,8 +302,7 @@ pub(crate) fn try_fill_microsoft_password(tab: &Arc<Tab>, password: &str) -> Res
             Err(err) => {
                 info!(
                     "Microsoft password selector '{}' not ready yet: {:#}",
-                    selector,
-                    err
+                    selector, err
                 );
             }
         }
@@ -301,13 +315,13 @@ pub(crate) fn try_fill_microsoft_password(tab: &Arc<Tab>, password: &str) -> Res
     element.scroll_into_view()?;
     element.click()?;
 
-    let modifier_combos: [&[ModifierKey]; 2] = [
-        &[ModifierKey::Ctrl],
-        &[ModifierKey::Meta],
-    ];
+    let modifier_combos: [&[ModifierKey]; 2] = [&[ModifierKey::Ctrl], &[ModifierKey::Meta]];
 
     for modifiers in modifier_combos {
-        if tab.press_key_with_modifiers("KeyA", Some(modifiers)).is_ok() {
+        if tab
+            .press_key_with_modifiers("KeyA", Some(modifiers))
+            .is_ok()
+        {
             let _ = tab.press_key("Backspace");
             break;
         }
@@ -317,7 +331,9 @@ pub(crate) fn try_fill_microsoft_password(tab: &Arc<Tab>, password: &str) -> Res
         .context("Failed to type Microsoft password")?;
 
     if tab.press_key("Enter").is_err() {
-        if let Ok(button) = tab.wait_for_element_with_custom_timeout("#idSIButton9", Duration::from_secs(3)) {
+        if let Ok(button) =
+            tab.wait_for_element_with_custom_timeout("#idSIButton9", Duration::from_secs(3))
+        {
             info!("Clicking Microsoft sign-in button directly");
             button.scroll_into_view()?;
             button.click()?;

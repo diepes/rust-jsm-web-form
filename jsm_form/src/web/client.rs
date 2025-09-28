@@ -34,7 +34,7 @@ impl JsmWebClient {
             return Ok(Arc::clone(tab));
         }
         // Save sessions data to persist logins across runs
-        let user_data_path = Some(PathBuf::from("./chrome_session_data_pvt")); 
+        let user_data_path = Some(PathBuf::from("./chrome_session_data_pvt"));
         info!("Initializing browser...");
         if self.browser.is_none() {
             let browser = Browser::new(
@@ -137,40 +137,32 @@ impl JsmWebClient {
             ))
         }
     }
-
-    fn click_button_with_text(&self, candidate_texts: &[&str]) -> Result<bool> {
+    fn click_button_save(&self) -> Result<bool> {
         let tab = self.tab()?;
-        let texts_json = to_string(candidate_texts)?;
-        let script = format!(
-            r#"(function() {{
-                const targets = {}.map(t => t.toLowerCase().trim());
-                const elements = Array.from(document.querySelectorAll('button, [role=\"button\"], a[role=\"button\"]'));
-                for (const target of targets) {{
-                    const match = elements.find(el => (el.innerText || el.textContent || '').trim().toLowerCase() === target);
-                    if (match) {{
-                        match.click();
-                        return target;
-                    }}
-                }}
-                return '';
-            }})"#,
-            texts_json
-        );
 
-        let result = tab
-            .evaluate(&script, false)
-            .context("Failed to evaluate JavaScript to click button")?;
-        let return_value = result
-            .value
-            .and_then(|v| v.as_str().map(|s| s.to_string()))
-            .unwrap_or_default();
-        Ok(!return_value.is_empty())
+        info!("Findin save button ...");
+        let button = tab.wait_for_element("button.css.-vl1vwyf")?;
+        //let button = tab.wait_for_element("button[name='Edit form']")?;
+        info!("Button found, clicking... {:?}", button);
+        button.click()?;
+        tab.wait_until_navigated()?;
+        Ok(true)
+    }
+    fn click_button_edit_form(&self) -> Result<bool> {
+        let tab = self.tab()?;
+
+        info!("Waiting for 'Edit form' button to be present...");
+        let button = tab.wait_for_element("._19itidpf")?;
+        //let button = tab.wait_for_element("button[name='Edit form']")?;
+        info!("Button found, clicking... {:?}", button);
+        button.click()?;
+        tab.wait_until_navigated()?;
+        Ok(true)
     }
 
     fn open_risk_assessment_editor(&self) -> Result<()> {
         info!("Opening risk assessment edit form...");
-        let clicked =
-            self.click_button_with_text(&["Edit form", "Edit Form", "Edit risk assessment"])?;
+        let clicked = self.click_button_edit_form()?;
         if clicked {
             thread::sleep(Duration::from_secs(2));
             Ok(())
@@ -279,7 +271,7 @@ impl JsmWebClient {
     }
 
     fn save_risk_assessment_changes(&self) -> Result<()> {
-        let clicked = self.click_button_with_text(&["Save", "Update", "Done", "Close"])?;
+        let clicked = self.click_button_save()?;
         if clicked {
             info!("Clicked save/update button to submit risk assessment changes");
             thread::sleep(Duration::from_secs(2));

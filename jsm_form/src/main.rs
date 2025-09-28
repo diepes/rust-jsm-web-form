@@ -290,7 +290,10 @@ async fn main() -> Result<()> {
 
             let response = reqwest::Client::new()
                 .get(&request_type_url)
-                .basic_auth(&config.auth.username, Some(&config.auth.token_atlassian_api))
+                .basic_auth(
+                    &config.auth.username,
+                    Some(&config.auth.token_atlassian_api),
+                )
                 .header("Accept", "application/json")
                 .send()
                 .await?;
@@ -315,7 +318,10 @@ async fn main() -> Result<()> {
 
             let fields_response = reqwest::Client::new()
                 .get(&fields_url)
-                .basic_auth(&config.auth.username, Some(&config.auth.token_atlassian_api))
+                .basic_auth(
+                    &config.auth.username,
+                    Some(&config.auth.token_atlassian_api),
+                )
                 .header("Accept", "application/json")
                 .send()
                 .await?;
