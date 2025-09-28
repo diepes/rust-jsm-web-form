@@ -49,6 +49,17 @@ enum Commands {
         /// TOML file containing risk assessment configuration
         #[arg(short = 't', long = "toml")]
         toml_file: PathBuf,
+        /// Enable interactive step-through for the login automation
+        #[arg(long = "step-through")]
+        step_through: bool,
+        /// Skip specific step numbers during step-through (comma separated or repeat flag)
+        #[arg(
+            long = "skip-step",
+            value_name = "STEP",
+            value_delimiter = ',',
+            value_parser = clap::value_parser!(usize)
+        )]
+        skip_steps: Vec<usize>,
     },
     /// Analyze form structure (for debugging)
     Analyze {
@@ -182,7 +193,7 @@ async fn main() -> Result<()> {
             println!("Form submitted successfully!");
         }
         
-        Commands::RiskAssessment { config, ticket_id, toml_file } => {
+        Commands::RiskAssessment { config, ticket_id, toml_file, step_through, skip_steps } => {
             let mut config = jsm_form::config::load_config(&config)?;
             
             // Ensure credentials are provided
@@ -205,7 +216,13 @@ async fn main() -> Result<()> {
                 .with_context(|| format!("Failed to parse risk assessment configuration from TOML file: {}", toml_file.display()))?;
             
             println!("Completing risk assessment for ticket: {}", ticket_id);
-            jsm_form::web::complete_risk_assessment(&config, &ticket_id, &risk_config)?;
+            jsm_form::web::complete_risk_assessment_with_step(
+                &config,
+                &ticket_id,
+                &risk_config,
+                step_through,
+                &skip_steps,
+            )?;
             println!("Risk assessment completed successfully!");
         }
         
