@@ -1,6 +1,6 @@
+use crate::{AuthConfig, JsmConfig};
 use anyhow::Result;
 use std::path::Path;
-use crate::{JsmConfig, AuthConfig};
 
 /// Load configuration from a file
 pub fn load_config<P: AsRef<Path>>(path: P) -> Result<JsmConfig> {

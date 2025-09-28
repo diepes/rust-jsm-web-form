@@ -1,4 +1,4 @@
-use anyhow::{anyhow, Context, Result};
+use anyhow::{Context, Result, anyhow};
 use headless_chrome::{Browser, LaunchOptions, Tab};
 use serde_json::to_string;
 use std::sync::Arc;
@@ -8,24 +8,21 @@ use tracing::{error, info, warn};
 
 use crate::JsmConfig;
 
-use super::login::wait_for_ticket_page;
-use super::step::StepController;
+use super::login;
 use super::types::RiskAssessmentConfig;
 
 pub struct JsmWebClient {
     config: JsmConfig,
     browser: Option<Browser>,
-    step: StepController,
     tab: Option<Arc<Tab>>,
     count_nav: usize,
 }
 
 impl JsmWebClient {
-    pub fn new(config: JsmConfig, step_through: bool, skip_steps: &[usize]) -> Self {
+    pub fn new(config: JsmConfig) -> Self {
         Self {
             config,
             browser: None,
-            step: StepController::new(step_through, skip_steps),
             tab: None,
             count_nav: 0,
         }
@@ -49,22 +46,15 @@ impl JsmWebClient {
 
         let browser = self.browser.as_ref().unwrap();
         let tab = browser.new_tab()?;
-
-        // self
-        //     .step
-        //     .pause("Browser launched and new tab opened. Inspect the window before continuing.")?;
-
         self.tab = Some(Arc::clone(&tab));
 
         Ok(tab)
     }
 
     fn tab(&self) -> Result<Arc<Tab>> {
-        self
-            .tab
-            .as_ref()
-            .cloned()
-            .context("Browser tab not initialized. Call get_tab() before interacting with the page.")
+        self.tab.as_ref().cloned().context(
+            "Browser tab not initialized. Call get_tab() before interacting with the page.",
+        )
     }
 
     pub fn complete_risk_assessment(
@@ -75,20 +65,11 @@ impl JsmWebClient {
         info!("Starting risk assessment for ticket: {}", ticket_id);
         let tab = self.get_tab()?;
 
-        // self.step.pause(
-        //     "Ready to navigate to the ticket page. Press Enter when you're set to begin the login flow.",
-        // )?;
-
         let ticket_url = format!("{}/browse/{}", self.config.base_url, ticket_id);
         self.count_nav += 1;
         info!("Navigating #{} to: {}", self.count_nav, ticket_url);
         tab.navigate_to(&ticket_url)?;
         tab.wait_until_navigated()?;
-
-        self.step.pause(&format!(
-            "Current URL: {}",
-            tab.get_url()
-        ))?;
 
         info!("Verifying ticket page URL...");
         let login_username = {
@@ -100,35 +81,27 @@ impl JsmWebClient {
             }
         };
 
-        let is_on_correct_page = wait_for_ticket_page(
+        let is_on_correct_page = login::wait_for_ticket_page(
             &tab,
             &self.config.base_url,
             ticket_id,
             45,
             login_username,
-            &self.step,
         )?;
 
         if is_on_correct_page {
             info!("✅ Confirmed on correct ticket page: {}", ticket_id);
 
-            self.step
-                .pause("Ticket page detected. Inspect the page before opening the risk assessment editor.")?;
-
             self.open_risk_assessment_editor()?;
-
-            self.step.pause(
-                "Risk assessment editor opened (or opening). Press Enter to apply configured field updates.",
-            )?;
 
             if let Some(value) = &config.change_impact_assessment.security_controls_impact {
                 info!("Setting Security Controls Impact to '{}'.", value);
-                self.step.pause(&format!(
-                    "About to set Security Controls Impact to '{}'. Inspect the dropdown before continuing.",
-                    value
-                ))?;
                 self.select_dropdown_option(
-                    &["security controls impact", "security impact", "security control impact"],
+                    &[
+                        "security controls impact",
+                        "security impact",
+                        "security control impact",
+                    ],
                     value,
                 )?;
             } else {
@@ -137,13 +110,8 @@ impl JsmWebClient {
                 );
             }
 
-            self.step
-                .pause("Field updates complete. Press Enter to trigger the save action.")?;
             self.save_risk_assessment_changes()?;
             info!("Risk assessment updates submitted.");
-            self.step.pause(
-                "Automation finished. Inspect the ticket to confirm the update before closing the browser.",
-            )?;
             Ok(())
         } else {
             let current_url = tab.get_url();
@@ -151,7 +119,8 @@ impl JsmWebClient {
                 "Could not verify we're on the correct ticket page for {}.\nCurrent URL: {}\n\
                 This may be due to a login page or other redirect.\n\
                 Please try again after ensuring you're logged in.",
-                ticket_id, current_url
+                ticket_id,
+                current_url
             ))
         }
     }
@@ -187,7 +156,8 @@ impl JsmWebClient {
 
     fn open_risk_assessment_editor(&self) -> Result<()> {
         info!("Opening risk assessment edit form...");
-        let clicked = self.click_button_with_text(&["Edit form", "Edit Form", "Edit risk assessment"])?;
+        let clicked =
+            self.click_button_with_text(&["Edit form", "Edit Form", "Edit risk assessment"])?;
         if clicked {
             thread::sleep(Duration::from_secs(2));
             Ok(())
@@ -199,11 +169,7 @@ impl JsmWebClient {
         }
     }
 
-    fn select_dropdown_option(
-        &self,
-        field_keywords: &[&str],
-        desired_value: &str,
-    ) -> Result<()> {
+    fn select_dropdown_option(&self, field_keywords: &[&str], desired_value: &str) -> Result<()> {
         let tab = self.tab()?;
         let keywords_json = to_string(field_keywords)?;
         let value_json = to_string(desired_value)?;
@@ -318,16 +284,6 @@ pub fn complete_risk_assessment(
     ticket_id: &str,
     risk_config: &RiskAssessmentConfig,
 ) -> Result<()> {
-    complete_risk_assessment_with_step(config, ticket_id, risk_config, false, &[])
-}
-
-pub fn complete_risk_assessment_with_step(
-    config: &JsmConfig,
-    ticket_id: &str,
-    risk_config: &RiskAssessmentConfig,
-    step_through: bool,
-    skip_steps: &[usize],
-) -> Result<()> {
-    let mut client = JsmWebClient::new(config.clone(), step_through, skip_steps);
+    let mut client = JsmWebClient::new(config.clone());
     client.complete_risk_assessment(ticket_id, risk_config)
 }

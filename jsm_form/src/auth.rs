@@ -1,6 +1,6 @@
+use crate::AuthConfig;
 use anyhow::{Context, Result};
 use reqwest::Client;
-use crate::AuthConfig;
 
 /// Authenticate with the JSM instance using HTTP Basic Authentication
 /// This method validates the credentials by making a test API call to the service desk
@@ -8,21 +8,21 @@ pub async fn authenticate(client: &Client, auth: &AuthConfig, base_url: &str) ->
     // For Atlassian Cloud instances, we use HTTP Basic Authentication with email:api_token
     // Test authentication by making a simple API call to get service desk info
     let test_url = format!("{}/rest/servicedeskapi/servicedesk", base_url);
-    
+
     let response = client
         .get(&test_url)
         .basic_auth(&auth.username, Some(&auth.password))
         .send()
         .await
         .context("Failed to test authentication")?;
-    
+
     if response.status().is_success() {
         tracing::info!("Authentication successful");
         Ok(())
     } else {
         let status = response.status();
         let error_body = response.text().await.unwrap_or_default();
-        
+
         if status == 401 {
             Err(anyhow::anyhow!(
                 "Authentication failed: Invalid credentials. Make sure you're using:\n\

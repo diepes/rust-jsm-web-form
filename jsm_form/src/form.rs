@@ -1,28 +1,25 @@
+use crate::{FormData, JsmConfig};
 use anyhow::{Context, Result};
 use reqwest::Client;
 use serde::{Deserialize, Serialize};
-use crate::{JsmConfig, FormData};
 
 /// Remove any keys that are known to be configuration-only or not valid for the JSM REST API.
-fn sanitize_request_fields(mut fields: std::collections::HashMap<String, serde_json::Value>) -> std::collections::HashMap<String, serde_json::Value> {
+fn sanitize_request_fields(
+    mut fields: std::collections::HashMap<String, serde_json::Value>,
+) -> std::collections::HashMap<String, serde_json::Value> {
     // Keys we know should not be sent to the API
     const CONFIG_KEYS: [&str; 1] = ["risk_assessment"]; // extend as needed
-    for k in CONFIG_KEYS { fields.remove(k); }
+    for k in CONFIG_KEYS {
+        fields.remove(k);
+    }
     fields
 }
 
 /// Submit form data to the JSM service desk using the REST API
-pub async fn submit_form(
-    client: &Client,
-    config: &JsmConfig,
-    form_data: FormData,
-) -> Result<()> {
+pub async fn submit_form(client: &Client, config: &JsmConfig, form_data: FormData) -> Result<()> {
     // Use the Atlassian Service Desk REST API to create a customer request
-    let create_request_url = format!(
-        "{}/rest/servicedeskapi/request",
-        config.base_url
-    );
-    
+    let create_request_url = format!("{}/rest/servicedeskapi/request", config.base_url);
+
     // Prepare the request payload according to Atlassian API format
     let cleaned_fields = sanitize_request_fields(form_data.fields);
     let request_payload = CreateRequestPayload {
@@ -31,9 +28,9 @@ pub async fn submit_form(
         request_field_values: cleaned_fields,
         raise_on_behalf_of: None, // Current user
     };
-    
+
     tracing::info!("Creating service desk request via API...");
-    
+
     let response = client
         .post(&create_request_url)
         .basic_auth(&config.auth.username, Some(&config.auth.password))
@@ -43,29 +40,32 @@ pub async fn submit_form(
         .send()
         .await
         .context("Failed to submit service desk request")?;
-    
+
     if response.status().is_success() {
-        let response_body: CreateRequestResponse = response
-            .json()
-            .await
-            .context("Failed to parse response")?;
-        
+        let response_body: CreateRequestResponse =
+            response.json().await.context("Failed to parse response")?;
+
         tracing::info!("Service desk request created successfully!");
         tracing::info!("Request ID: {}", response_body.issue_key);
-        tracing::info!("Request URL: {}/browse/{}", 
-                      config.base_url, response_body.issue_key);
+        tracing::info!(
+            "Request URL: {}/browse/{}",
+            config.base_url,
+            response_body.issue_key
+        );
         Ok(())
     } else {
         let status = response.status();
         let error_body = response.text().await.unwrap_or_default();
-        
+
         tracing::error!("Request creation failed with status: {}", status);
         tracing::error!("Error details: {}", error_body);
-        
+
         if status == 400 {
             Err(anyhow::anyhow!(
                 "Bad request: Check that your portal_id ({}) and request_type_id ({}) are correct, and that all required fields are provided.\nError details: {}",
-                config.portal_id, config.request_type_id, error_body
+                config.portal_id,
+                config.request_type_id,
+                error_body
             ))
         } else if status == 401 {
             Err(anyhow::anyhow!(

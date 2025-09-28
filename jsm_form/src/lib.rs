@@ -1,18 +1,18 @@
 //! JSM Form Automation Library
-//! 
+//!
 //! This library provides functionality to automate completion of JSM (Jira Service Management) web forms.
 
 pub mod auth;
-pub mod form;
 pub mod config;
 pub mod error;
+pub mod form;
 pub mod web;
 
 use anyhow::Result;
 use serde::{Deserialize, Serialize};
 
 // Re-export web automation types
-pub use web::{RiskAssessmentConfig, ChangeImpactAssessmentConfig, ChangeRiskAssessmentConfig};
+pub use web::{ChangeImpactAssessmentConfig, ChangeRiskAssessmentConfig, RiskAssessmentConfig};
 
 /// Configuration for the JSM form automation
 #[derive(Debug, Clone, Deserialize, Serialize)]
@@ -58,7 +58,7 @@ impl JsmFormClient {
             .cookie_store(true)
             .build()
             .expect("Failed to create HTTP client");
-        
+
         Self { config, client }
     }
 
@@ -69,10 +69,6 @@ impl JsmFormClient {
 
     /// Submit form data to the JSM form
     pub async fn submit_form(&self, form_data: FormData) -> Result<()> {
-        form::submit_form(
-            &self.client,
-            &self.config,
-            form_data,
-        ).await
+        form::submit_form(&self.client, &self.config, form_data).await
     }
 }
