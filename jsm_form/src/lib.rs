@@ -6,6 +6,7 @@ pub mod auth;
 pub mod config;
 pub mod error;
 pub mod form;
+pub mod logging;
 pub mod web;
 
 use anyhow::Result;
@@ -35,7 +36,6 @@ pub struct AuthConfig {
     /// Username for authentication
     pub username: String,
     /// API Token for authentication
-    #[serde(alias = "password", default)]
     pub token_atlassian_api: String,
     /// Password used for Microsoft login flow
     #[serde(default)]

@@ -2,7 +2,6 @@ use anyhow::{Context, Result};
 use headless_chrome::{Tab, browser::tab::ModifierKey};
 use std::sync::Arc;
 use std::time::Duration;
-use tracing::{info, warn};
 
 pub(crate) fn is_on_ticket_page(url: &str, ticket_id: &str) -> bool {
     url.contains(&format!("/browse/{}", ticket_id))
@@ -16,7 +15,7 @@ pub(crate) fn wait_for_ticket_page(
     username: Option<&str>,
     password: Option<&str>,
 ) -> Result<bool> {
-    info!("Going through login steps ...");
+    crate::log_info!("Going through login steps ...");
     let mut start_time = std::time::Instant::now();
     let timeout = Duration::from_secs(timeout_secs);
 
@@ -33,14 +32,14 @@ pub(crate) fn wait_for_ticket_page(
         std::thread::sleep(Duration::from_millis(5000));
         tab.wait_until_navigated()?;
         let new_url = tab.get_url();
-        info!("Check new URL: {}", new_url);
+        crate::log_info!("Check new URL: {}", new_url);
 
         if is_on_ticket_page(&new_url, ticket_id) {
             return Ok(true);
         }
         if new_url == current_url {
             if !warned_same_url && start_time.elapsed() > Duration::from_secs(10) {
-                warn!(
+                crate::log_warn!(
                     "Login URL has remained at {} for over 10 seconds; continuing to monitor in case manual action is required.",
                     new_url
                 );
@@ -52,15 +51,15 @@ pub(crate) fn wait_for_ticket_page(
             if !atlassian_username_done {
                 match try_fill_atlassian_username(tab, user) {
                     Ok(true) => {
-                        info!("Filled Atlassian username and triggered continue/login");
+                        crate::log_info!("Filled Atlassian username and triggered continue/login");
                         atlassian_username_done = true;
                         continue;
                     }
                     Ok(false) => {
-                        info!("Atlassian username field not ready yet; will retry...");
+                        crate::log_info!("Atlassian username field not ready yet; will retry...");
                     }
                     Err(err) => {
-                        warn!("Failed to auto-fill Atlassian username: {err:?}");
+                        crate::log_warn!("Failed to auto-fill Atlassian username: {err:?}");
                         atlassian_username_done = true;
                     }
                 }
@@ -71,17 +70,19 @@ pub(crate) fn wait_for_ticket_page(
             if !account_continue_done {
                 match try_click_account_continue(tab, user) {
                     Ok(true) => {
-                        info!("Detected matching Atlassian account; clicked Continue");
+                        crate::log_info!("Detected matching Atlassian account; clicked Continue");
                         account_continue_done = true;
                         continue;
                     }
                     Ok(false) => {
-                        info!(
+                        crate::log_info!(
                             "Account selection screen present but Continue button not clicked yet"
                         );
                     }
                     Err(err) => {
-                        warn!("Failed to auto-continue Atlassian account selection: {err:?}");
+                        crate::log_warn!(
+                            "Failed to auto-continue Atlassian account selection: {err:?}"
+                        );
                         account_continue_done = true;
                     }
                 }
@@ -90,7 +91,7 @@ pub(crate) fn wait_for_ticket_page(
             .starts_with("https://login.microsoftonline.com/common/DeviceAuthTls/reprocess")
         {
             if !warned_same_url {
-                info!(
+                crate::log_info!(
                     "Microsoft 2FA reprocess detected (URL: {}). Waiting for user to complete multi-factor authentication...",
                     new_url
                 );
@@ -105,30 +106,32 @@ pub(crate) fn wait_for_ticket_page(
             if !microsoft_username_done {
                 match try_fill_microsoft_username(tab, user) {
                     Ok(true) => {
-                        info!("Filled Microsoft login username and pressed Next");
+                        crate::log_info!("Filled Microsoft login username and pressed Next");
                         microsoft_username_done = true;
                         continue;
                     }
                     Ok(false) => {
-                        info!("Microsoft login username field not ready yet; will retry...");
+                        crate::log_info!(
+                            "Microsoft login username field not ready yet; will retry..."
+                        );
                     }
                     Err(err) => {
-                        warn!("Failed to auto-fill Microsoft username: {err:?}");
+                        crate::log_warn!("Failed to auto-fill Microsoft username: {err:?}");
                         microsoft_username_done = true;
                     }
                 }
             } else if !microsoft_password_done {
                 match try_fill_microsoft_password(tab, pass) {
                     Ok(true) => {
-                        info!("Filled Microsoft password and submitted");
+                        crate::log_info!("Filled Microsoft password and submitted");
                         microsoft_password_done = true;
                         continue;
                     }
                     Ok(false) => {
-                        info!("Microsoft password field not ready yet; will retry...");
+                        crate::log_info!("Microsoft password field not ready yet; will retry...");
                     }
                     Err(err) => {
-                        warn!("Failed to auto-fill Microsoft password: {err:?}");
+                        crate::log_warn!("Failed to auto-fill Microsoft password: {err:?}");
                         microsoft_password_done = true;
                     }
                 }
@@ -136,14 +139,14 @@ pub(crate) fn wait_for_ticket_page(
         }
 
         if new_url != current_url {
-            info!("URL changed; resetting timeout. URL: {}", new_url);
+            crate::log_info!("URL changed; resetting timeout. URL: {}", new_url);
             current_url = new_url.clone();
             start_time = std::time::Instant::now();
             warned_same_url = false;
         }
     }
 
-    info!(
+    crate::log_info!(
         "Could not verify we're on the ticket page. Current URL: {}",
         current_url
     );
@@ -152,7 +155,7 @@ pub(crate) fn wait_for_ticket_page(
 
 pub(crate) fn try_fill_atlassian_username(tab: &Arc<Tab>, username: &str) -> Result<bool> {
     if username.trim().is_empty() {
-        warn!("No Atlassian username provided; skipping auto-fill");
+        crate::log_warn!("No Atlassian username provided; skipping auto-fill");
         return Ok(false);
     }
 
@@ -167,7 +170,7 @@ pub(crate) fn try_fill_atlassian_username(tab: &Arc<Tab>, username: &str) -> Res
     for selector in SELECTORS {
         match tab.wait_for_element_with_custom_timeout(selector, Duration::from_secs(5)) {
             Ok(element) => {
-                info!(
+                crate::log_info!(
                     "Found Atlassian username field with selector '{}'; focusing",
                     selector
                 );
@@ -175,7 +178,7 @@ pub(crate) fn try_fill_atlassian_username(tab: &Arc<Tab>, username: &str) -> Res
                 break;
             }
             Err(err) => {
-                info!("Username selector '{}' not ready yet: {:#}", selector, err);
+                crate::log_info!("Username selector '{}' not ready yet: {:#}", selector, err);
             }
         }
     }
@@ -209,10 +212,10 @@ pub(crate) fn try_fill_atlassian_username(tab: &Arc<Tab>, username: &str) -> Res
 
 pub(crate) fn try_fill_microsoft_username(tab: &Arc<Tab>, username: &str) -> Result<bool> {
     if username.trim().is_empty() {
-        warn!("No Microsoft username provided; skipping auto-fill");
+        crate::log_warn!("No Microsoft username provided; skipping auto-fill");
         return Ok(false);
     } else {
-        info!("Filling Microsoft username: {}", username);
+        crate::log_info!("Filling Microsoft username: {}", username);
     }
 
     const SELECTORS: &[&str] = &[
@@ -225,7 +228,7 @@ pub(crate) fn try_fill_microsoft_username(tab: &Arc<Tab>, username: &str) -> Res
     for selector in SELECTORS {
         match tab.wait_for_element_with_custom_timeout(selector, Duration::from_secs(5)) {
             Ok(element) => {
-                info!(
+                crate::log_info!(
                     "Found Microsoft username field with selector '{}'; focusing",
                     selector
                 );
@@ -233,9 +236,10 @@ pub(crate) fn try_fill_microsoft_username(tab: &Arc<Tab>, username: &str) -> Res
                 break;
             }
             Err(err) => {
-                info!(
+                crate::log_info!(
                     "Microsoft username selector '{}' not ready yet: {:#}",
-                    selector, err
+                    selector,
+                    err
                 );
             }
         }
@@ -267,7 +271,7 @@ pub(crate) fn try_fill_microsoft_username(tab: &Arc<Tab>, username: &str) -> Res
         if let Ok(button) =
             tab.wait_for_element_with_custom_timeout("#idSIButton9", Duration::from_secs(2))
         {
-            info!("Clicking Microsoft Next button directly");
+            crate::log_info!("Clicking Microsoft Next button directly");
             button.scroll_into_view()?;
             button.click()?;
         }
@@ -278,7 +282,7 @@ pub(crate) fn try_fill_microsoft_username(tab: &Arc<Tab>, username: &str) -> Res
 
 pub(crate) fn try_fill_microsoft_password(tab: &Arc<Tab>, password: &str) -> Result<bool> {
     if password.trim().is_empty() {
-        warn!("No Microsoft password provided; skipping auto-fill");
+        crate::log_warn!("No Microsoft password provided; skipping auto-fill");
         return Ok(false);
     }
 
@@ -292,7 +296,7 @@ pub(crate) fn try_fill_microsoft_password(tab: &Arc<Tab>, password: &str) -> Res
     for selector in SELECTORS {
         match tab.wait_for_element_with_custom_timeout(selector, Duration::from_secs(5)) {
             Ok(element) => {
-                info!(
+                crate::log_info!(
                     "Found Microsoft password field with selector '{}'; focusing",
                     selector
                 );
@@ -300,9 +304,10 @@ pub(crate) fn try_fill_microsoft_password(tab: &Arc<Tab>, password: &str) -> Res
                 break;
             }
             Err(err) => {
-                info!(
+                crate::log_info!(
                     "Microsoft password selector '{}' not ready yet: {:#}",
-                    selector, err
+                    selector,
+                    err
                 );
             }
         }
@@ -334,7 +339,7 @@ pub(crate) fn try_fill_microsoft_password(tab: &Arc<Tab>, password: &str) -> Res
         if let Ok(button) =
             tab.wait_for_element_with_custom_timeout("#idSIButton9", Duration::from_secs(3))
         {
-            info!("Clicking Microsoft sign-in button directly");
+            crate::log_info!("Clicking Microsoft sign-in button directly");
             button.scroll_into_view()?;
             button.click()?;
         } else {
@@ -347,7 +352,7 @@ pub(crate) fn try_fill_microsoft_password(tab: &Arc<Tab>, password: &str) -> Res
 
 pub(crate) fn try_click_account_continue(tab: &Arc<Tab>, username: &str) -> Result<bool> {
     if username.trim().is_empty() {
-        warn!("No Atlassian username provided; skipping continue button automation");
+        crate::log_warn!("No Atlassian username provided; skipping continue button automation");
         return Ok(false);
     }
 

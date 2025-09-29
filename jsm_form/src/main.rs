@@ -5,7 +5,6 @@ use serde_json::Value;
 use std::collections::HashMap;
 use std::io::{self, Write};
 use std::path::PathBuf;
-use tracing_subscriber;
 
 #[derive(Parser)]
 #[command(name = "jsm_form")]
@@ -35,7 +34,7 @@ enum Commands {
         #[arg(short = 'j', long = "json")]
         json_file: Option<PathBuf>,
         /// TOML file containing form data
-        #[arg(short = 't', long = "toml")]
+        #[arg(short = 't', long = "toml", default_value = "ticket.toml")]
         toml_file: Option<PathBuf>,
     },
     /// Complete risk assessment form for an existing ticket
@@ -47,7 +46,7 @@ enum Commands {
         #[arg(short = 'i', long = "ticket-id")]
         ticket_id: String,
         /// TOML file containing risk assessment configuration
-        #[arg(short = 't', long = "toml")]
+        #[arg(short = 't', long = "toml", default_value = "ticket.toml")]
         toml_file: PathBuf,
     },
     /// Analyze form structure (for debugging)
@@ -105,7 +104,7 @@ fn ensure_credentials(config: &mut JsmConfig) -> Result<()> {
 #[tokio::main]
 async fn main() -> Result<()> {
     // Initialize tracing
-    tracing_subscriber::fmt::init();
+    jsm_form::logging::init_logging();
 
     let cli = Cli::parse();
 
@@ -131,7 +130,7 @@ async fn main() -> Result<()> {
             let client = JsmFormClient::new(config);
 
             // Authenticate first
-            println!("Authenticating...");
+            println!("main.rs:Submit Authenticating...");
             client.authenticate().await?;
             println!("Authentication successful!");
 
@@ -271,7 +270,7 @@ async fn main() -> Result<()> {
 
             let client = JsmFormClient::new(config.clone());
 
-            println!("Authenticating...");
+            println!("main.rs:Analyze Authenticating...");
             client.authenticate().await?;
             println!("Authentication successful!");
 

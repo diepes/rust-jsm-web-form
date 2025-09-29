@@ -29,7 +29,7 @@ pub async fn submit_form(client: &Client, config: &JsmConfig, form_data: FormDat
         raise_on_behalf_of: None, // Current user
     };
 
-    tracing::info!("Creating service desk request via API...");
+    crate::log_info!("Creating service desk request via API...");
 
     let response = client
         .post(&create_request_url)
@@ -48,9 +48,9 @@ pub async fn submit_form(client: &Client, config: &JsmConfig, form_data: FormDat
         let response_body: CreateRequestResponse =
             response.json().await.context("Failed to parse response")?;
 
-        tracing::info!("Service desk request created successfully!");
-        tracing::info!("Request ID: {}", response_body.issue_key);
-        tracing::info!(
+        crate::log_info!("Service desk request created successfully!");
+        crate::log_info!("Request ID: {}", response_body.issue_key);
+        crate::log_info!(
             "Request URL: {}/browse/{}",
             config.base_url,
             response_body.issue_key
@@ -60,8 +60,8 @@ pub async fn submit_form(client: &Client, config: &JsmConfig, form_data: FormDat
         let status = response.status();
         let error_body = response.text().await.unwrap_or_default();
 
-        tracing::error!("Request creation failed with status: {}", status);
-        tracing::error!("Error details: {}", error_body);
+        crate::log_error!("Request creation failed with status: {}", status);
+        crate::log_error!("Error details: {}", error_body);
 
         if status == 400 {
             Err(anyhow::anyhow!(

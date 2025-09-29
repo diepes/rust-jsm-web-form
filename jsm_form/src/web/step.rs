@@ -2,7 +2,6 @@ use anyhow::{Context, Result};
 use std::collections::HashSet;
 use std::io::{self, Write};
 use std::sync::atomic::{AtomicUsize, Ordering};
-use tracing::info;
 
 #[derive(Debug)]
 pub(crate) struct StepController {
@@ -31,12 +30,12 @@ impl StepController {
         }
 
         if self.skip_steps.contains(&step_number) {
-            info!("Skipping interactive step {}: {}", step_number, description);
+            crate::log_info!("Skipping interactive step {}: {}", step_number, description);
             println!("\n--- Skipping Step {}: {}", step_number, description);
             return Ok(());
         }
 
-        info!("Interactive step {}: {}", step_number, description);
+    crate::log_info!("Interactive step {}: {}", step_number, description);
         println!("\n=== Step {}: {} ===", step_number, description);
         print!("Press Enter to continue...");
         io::stdout()

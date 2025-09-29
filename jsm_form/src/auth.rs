@@ -17,7 +17,7 @@ pub async fn authenticate(client: &Client, auth: &AuthConfig, base_url: &str) ->
         .context("Failed to test authentication")?;
 
     if response.status().is_success() {
-        tracing::info!("Authentication successful");
+        crate::log_info!("Authentication successful");
         Ok(())
     } else {
         let status = response.status();
@@ -25,18 +25,22 @@ pub async fn authenticate(client: &Client, auth: &AuthConfig, base_url: &str) ->
 
         if status == 401 {
             Err(anyhow::anyhow!(
-                "Authentication failed: Invalid credentials. Make sure you're using:\n\
+                "status=401 Authentication failed: Invalid credentials. Make sure you're using:\n\
                 - Email address as username\n\
                 - API token as password (not your account password)\n\
-                Create an API token at: https://id.atlassian.com/manage-profile/security/api-tokens"
+                Create an API token at: https://id.atlassian.com/manage-profile/security/api-tokens\n\
+                Error details: {}\n",
+                error_body
             ))
         } else if status == 403 {
             Err(anyhow::anyhow!(
-                "Authentication successful but access denied. You may not have permission to access this service desk."
+                "status=403 Authentication successful but access denied. You may not have permission to access this service desk.\n\
+                Error details: {}\n",
+                error_body
             ))
         } else {
             Err(anyhow::anyhow!(
-                "Authentication failed with status: {} - {}",
+                "Authentication failed with status: {} - {}\n",
                 status,
                 error_body
             ))
