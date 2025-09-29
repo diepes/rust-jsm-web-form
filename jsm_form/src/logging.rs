@@ -2,6 +2,7 @@ use std::fmt;
 
 use tracing::field::{Field, Visit};
 use tracing::{Event, Subscriber};
+use tracing::Level;
 use tracing_subscriber::fmt::format::Writer;
 use tracing_subscriber::fmt::{FmtContext, FormatEvent, FormatFields};
 use tracing_subscriber::registry::LookupSpan;
@@ -15,9 +16,20 @@ impl Default for FunctionFormatter {
     }
 }
 
+fn color_codes(level: &Level) -> (&'static str, &'static str) {
+    match *level {
+        Level::TRACE => ("\x1b[90m", "\x1b[0m"),   // Bright black
+        Level::DEBUG => ("\x1b[34m", "\x1b[0m"),   // Blue
+        Level::INFO => ("\x1b[32m", "\x1b[0m"),    // Green
+        Level::WARN => ("\x1b[33m", "\x1b[0m"),    // Yellow
+        Level::ERROR => ("\x1b[31m", "\x1b[0m"),   // Red
+    }
+}
+
 struct EventVisitor {
     message: Option<String>,
     function: Option<String>,
+    location: Option<String>,
     other_fields: Vec<(String, String)>,
 }
 
@@ -26,6 +38,7 @@ impl EventVisitor {
         Self {
             message: None,
             function: None,
+            location: None,
             other_fields: Vec::new(),
         }
     }
@@ -46,6 +59,7 @@ impl Visit for EventVisitor {
         match field.name() {
             "message" => self.message = Some(cleaned),
             "function" => self.function = Some(cleaned),
+            "location" => self.location = Some(cleaned),
             name => self.other_fields.push((name.to_string(), cleaned)),
         }
     }
@@ -55,6 +69,7 @@ impl Visit for EventVisitor {
         match field.name() {
             "message" => self.message = Some(cleaned),
             "function" => self.function = Some(cleaned),
+            "location" => self.location = Some(cleaned),
             name => self.other_fields.push((name.to_string(), cleaned)),
         }
     }
@@ -78,7 +93,23 @@ where
         let mut visitor = EventVisitor::new();
         event.record(&mut visitor);
 
-        write!(writer, "{level} {module_path}")?;
+        let (color_start, color_end) = color_codes(level);
+        write!(writer, "{color_start}{level}{color_end}")?;
+
+        if let Some(location) = visitor.location {
+            write!(writer, " {location}")?;
+        } else if let Some(file) = metadata.file() {
+            match metadata.line() {
+                Some(line) => {
+                    write!(writer, " {file}:{line}")?;
+                }
+                None => {
+                    write!(writer, " {file}")?;
+                }
+            }
+        }
+
+        write!(writer, " {module_path}")?;
 
         if let Some(function) = visitor.function {
             write!(writer, "::{function}")?;
@@ -193,6 +224,10 @@ mod tests {
             output.contains("jsm_form::logging::tests::function_name_includes_module_and_level"),
             "output missing module/function: {output:?}"
         );
+        assert!(
+            output.contains("src/logging.rs:"),
+            "output missing clickable location: {output:?}"
+        );
         assert!(output.contains("sample message"), "output missing message: {output:?}");
     }
 }
@@ -215,34 +250,59 @@ macro_rules! __log_function_path {
 #[macro_export]
 macro_rules! log_trace {
     ($($arg:tt)*) => {{
-        tracing::trace!(function = %$crate::__log_function_path!(), $($arg)*);
+        const __LOCATION: &str = concat!(file!(), ":", line!(), ":", column!());
+        tracing::trace!(
+            function = %$crate::__log_function_path!(),
+            location = %__LOCATION,
+            $($arg)*
+        );
     }};
 }
 
 #[macro_export]
 macro_rules! log_debug {
     ($($arg:tt)*) => {{
-        tracing::debug!(function = %$crate::__log_function_path!(), $($arg)*);
+        const __LOCATION: &str = concat!(file!(), ":", line!(), ":", column!());
+        tracing::debug!(
+            function = %$crate::__log_function_path!(),
+            location = %__LOCATION,
+            $($arg)*
+        );
     }};
 }
 
 #[macro_export]
 macro_rules! log_info {
     ($($arg:tt)*) => {{
-        tracing::info!(function = %$crate::__log_function_path!(), $($arg)*);
+        const __LOCATION: &str = concat!(file!(), ":", line!(), ":", column!());
+        tracing::info!(
+            function = %$crate::__log_function_path!(),
+            location = %__LOCATION,
+            $($arg)*
+        );
     }};
 }
 
 #[macro_export]
 macro_rules! log_warn {
     ($($arg:tt)*) => {{
-        tracing::warn!(function = %$crate::__log_function_path!(), $($arg)*);
+        const __LOCATION: &str = concat!(file!(), ":", line!(), ":", column!());
+        tracing::warn!(
+            function = %$crate::__log_function_path!(),
+            location = %__LOCATION,
+            $($arg)*
+        );
     }};
 }
 
 #[macro_export]
 macro_rules! log_error {
     ($($arg:tt)*) => {{
-        tracing::error!(function = %$crate::__log_function_path!(), $($arg)*);
+        const __LOCATION: &str = concat!(file!(), ":", line!(), ":", column!());
+        tracing::error!(
+            function = %$crate::__log_function_path!(),
+            location = %__LOCATION,
+            $($arg)*
+        );
     }};
 }
